@@ -143,10 +143,16 @@ export function calculateAssessment(
   let totalInterest = 0;
   let monthlyEmi = 0;
   
-  const loanTermMonths = financing.loanTermYears * 12;
+  // Determine loan term based on financing model and system size
+  let loanTermYears = financing.loanTermYears;
+  if (financing.financingModel === "udb" && recommendedKw < 100) {
+    loanTermYears = 7; // UDB model: 7 years for systems < 100 kW
+  }
+  
+  const loanTermMonths = loanTermYears * 12;
   
   if (financing.financingModel === "bank") {
-    // Bank loan: 10% down, 90% loan, diminishing interest
+    // Bank loan: 10% down, 90% loan, reducing balance
     downPayment = totalSystemCost * 0.10;
     loanPrincipal = totalSystemCost * 0.90;
     
@@ -161,13 +167,28 @@ export function calculateAssessment(
       monthlyEmi = loanPrincipal / n;
       totalInterest = 0;
     }
-  } else {
-    // UDB: 100% financed, flat interest
+  } else if (financing.financingModel === "udb") {
+    // UDB: 100% financed, reducing balance (not flat)
     downPayment = 0;
     loanPrincipal = totalSystemCost;
     
-    totalInterest = loanPrincipal * (financing.udbFlatRate / 100) * financing.loanTermYears;
-    monthlyEmi = (loanPrincipal + totalInterest) / loanTermMonths;
+    const monthlyRate = financing.udbFlatRate / 12 / 100;
+    const n = loanTermMonths;
+    
+    if (monthlyRate > 0) {
+      monthlyEmi = loanPrincipal * monthlyRate * Math.pow(1 + monthlyRate, n) / 
+                   (Math.pow(1 + monthlyRate, n) - 1);
+      totalInterest = (monthlyEmi * n) - loanPrincipal;
+    } else {
+      monthlyEmi = loanPrincipal / n;
+      totalInterest = 0;
+    }
+  } else {
+    // Zero investment model
+    downPayment = 0;
+    loanPrincipal = 0;
+    totalInterest = 0;
+    monthlyEmi = 0;
   }
   
   const totalRepayable = downPayment + loanPrincipal + totalInterest;
@@ -177,8 +198,8 @@ export function calculateAssessment(
   const annualEmi = monthlyEmi * 12;
   const netAnnualCashflow = annualSavings - annualEmi;
   
-  // Simple payback: total outlay / annual savings
-  let paybackYears = totalRepayable / annualSavings;
+  // Simple payback: system cost / annual savings (not including interest)
+  let paybackYears = annualSavings > 0 ? totalSystemCost / annualSavings : 0;
   
   // Add 1 year if private bank selected
   if (financing.privateBank) {

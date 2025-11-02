@@ -126,8 +126,19 @@ export function calculateAssessment(
     warnings.push("Estimated generation exceeds consumption - verify net metering policy");
   }
   
-  // System cost
-  const baseSystemCost = recommendedKw * inputs.systemCostPerKw;
+  // Tiered pricing based on system capacity
+  let ratePerKw = inputs.systemCostPerKw;
+  if (financing.financingModel === "bank" || financing.financingModel === "udb") {
+    if (recommendedKw >= 100) {
+      ratePerKw = 35000;
+    } else if (recommendedKw >= 50) {
+      ratePerKw = 40000;
+    } else {
+      ratePerKw = 45000;
+    }
+  }
+  
+  const baseSystemCost = recommendedKw * ratePerKw;
   const gstAmount = baseSystemCost * (inputs.gstPercent / 100);
   const totalSystemCost = baseSystemCost + gstAmount;
   

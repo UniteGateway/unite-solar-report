@@ -17,10 +17,13 @@ export interface FormData {
   pinCode: string;
   contactNumber: string;
   email: string;
+  shedType: string;
+  sitePhotos: File[];
   netUnits: string;
   cmd: string;
   transformerCapacity: string;
   availableSpace: string;
+  requiredSpace: string;
   spaceUtilization: number;
   stateKey: string;
   tariffPerUnit: string;
@@ -38,9 +41,27 @@ interface Props {
 
 export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
   const [ocrStatus, setOcrStatus] = useState<string>("");
+  const [photoPreview, setPhotoPreview] = useState<string[]>([]);
 
   const updateField = (field: keyof FormData, value: any) => {
     onChange({ ...formData, [field]: value });
+  };
+
+  const handleSitePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const newPhotos = [...(formData.sitePhotos || []), ...files];
+      updateField("sitePhotos", newPhotos);
+      
+      // Create preview URLs
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPhotoPreview(prev => [...prev, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +144,61 @@ export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
               placeholder="Enter contact number"
             />
           </div>
+          
+          <div>
+            <Label htmlFor="shedType">Shed Type</Label>
+            <Select value={formData.shedType} onValueChange={(v) => updateField("shedType", v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select shed type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rcc">RCC</SelectItem>
+                <SelectItem value="tin">Tin Sheet</SelectItem>
+                <SelectItem value="gi">GI</SelectItem>
+                <SelectItem value="asbestos">Asbestos</SelectItem>
+                <SelectItem value="metal">Metal</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="md:col-span-2">
+            <Label>Site Photos</Label>
+            <div className="flex gap-2 mt-2">
+              <Button variant="outline" type="button" onClick={() => document.getElementById('siteCamera')?.click()}>
+                <Camera className="mr-2 h-4 w-4" />
+                Capture Photo
+              </Button>
+              <Button variant="outline" type="button" onClick={() => document.getElementById('sitePhoto')?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Photo
+              </Button>
+            </div>
+            <input
+              id="siteCamera"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              className="hidden"
+              onChange={handleSitePhotoUpload}
+            />
+            <input
+              id="sitePhoto"
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleSitePhotoUpload}
+            />
+            {photoPreview.length > 0 && (
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {photoPreview.map((preview, idx) => (
+                  <img key={idx} src={preview} alt={`Site ${idx + 1}`} className="h-20 w-20 object-cover rounded" />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -196,6 +272,18 @@ export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
               placeholder="Optional"
             />
           </div>
+          
+          <div>
+            <Label htmlFor="tariffPerUnit">Tariff (₹/Unit) *</Label>
+            <Input
+              id="tariffPerUnit"
+              type="number"
+              step="0.01"
+              value={formData.tariffPerUnit}
+              onChange={(e) => updateField("tariffPerUnit", e.target.value)}
+              placeholder="Enter tariff rate"
+            />
+          </div>
         </div>
       </Card>
 
@@ -211,6 +299,17 @@ export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
               value={formData.availableSpace}
               onChange={(e) => updateField("availableSpace", e.target.value)}
               placeholder="Total available space"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="requiredSpace">Required Space (sqft)</Label>
+            <Input
+              id="requiredSpace"
+              type="number"
+              value={formData.requiredSpace}
+              onChange={(e) => updateField("requiredSpace", e.target.value)}
+              placeholder="Calculated automatically"
             />
           </div>
           
@@ -254,24 +353,17 @@ export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
         <h3 className="text-lg font-semibold mb-4 text-foreground">Pricing Configuration</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <Label htmlFor="tariffPerUnit">Tariff (₹/unit)</Label>
-            <Input
-              id="tariffPerUnit"
-              type="number"
-              step="0.01"
-              value={formData.tariffPerUnit}
-              onChange={(e) => updateField("tariffPerUnit", e.target.value)}
-            />
-          </div>
-          
-          <div>
             <Label htmlFor="systemCostPerKw">System Cost (₹/kW)</Label>
             <Input
               id="systemCostPerKw"
               type="number"
               value={formData.systemCostPerKw}
               onChange={(e) => updateField("systemCostPerKw", e.target.value)}
+              placeholder="Base: ₹1000/kW"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              Tiered: &gt;100kW: ₹35k, &lt;100kW: ₹40k, &lt;50kW: ₹45k + GST 8.9%
+            </p>
           </div>
           
           <div>
@@ -304,6 +396,12 @@ export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
             />
           </div>
         </div>
+        <Alert className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Zero Investment: 60 months payment term with tiered pricing based on system capacity
+          </AlertDescription>
+        </Alert>
       </Card>
 
       <Button 

@@ -16,30 +16,33 @@ import uniteLogo from "@/assets/unite-logo.png";
 const Index = () => {
   const [formData, setFormData] = useState<FormData>({
     customerName: "",
-    businessType: "industry",
+    businessType: "",
     address: "",
     pinCode: "",
     contactNumber: "",
     email: "",
+    shedType: "",
+    sitePhotos: [],
     netUnits: "",
     cmd: "",
     transformerCapacity: "",
     availableSpace: "",
-    spaceUtilization: 90,
+    requiredSpace: "",
+    spaceUtilization: 80,
     stateKey: "telangana",
-    tariffPerUnit: "7.5",
+    tariffPerUnit: "6.50",
     systemCostPerKw: "1000",
-    gstPercent: "18",
+    gstPercent: "8.9",
     cmdEnhancementCost: "500",
-    sqftPerKw: "100"
+    sqftPerKw: "100",
   });
 
   const [financingData, setFinancingData] = useState<FinancingData>({
-    financingModel: "bank",
-    bankInterestRate: "8.9",
+    financingModel: "zero",
+    bankInterestRate: "9.0",
     udbFlatRate: "8.75",
     privateBank: false,
-    loanTermYears: "6"
+    loanTermYears: "5"
   });
 
   const [results, setResults] = useState<CalculationResults | null>(null);

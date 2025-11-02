@@ -49,7 +49,7 @@ export const FinancingOptions = ({ data, onChange, systemSize }: Props) => {
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="zero" id="zero" />
               <Label htmlFor="zero" className="font-normal cursor-pointer">
-                Zero Investment (UDB 100% financing)
+                Zero Investment (60 months, tiered pricing)
               </Label>
             </div>
           </RadioGroup>

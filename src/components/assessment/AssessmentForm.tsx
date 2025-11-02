@@ -18,7 +18,7 @@ export interface FormData {
   contactNumber: string;
   email: string;
   shedType: string;
-  sitePhotos: File[];
+  sitePhotos: string[]; // Store as data URLs for easy display
   netUnits: string;
   cmd: string;
   transformerCapacity: string;
@@ -41,7 +41,6 @@ interface Props {
 
 export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
   const [ocrStatus, setOcrStatus] = useState<string>("");
-  const [photoPreview, setPhotoPreview] = useState<string[]>([]);
 
   const updateField = (field: keyof FormData, value: any) => {
     onChange({ ...formData, [field]: value });
@@ -50,14 +49,12 @@ export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
   const handleSitePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      const newPhotos = [...(formData.sitePhotos || []), ...files];
-      updateField("sitePhotos", newPhotos);
-      
-      // Create preview URLs
+      // Convert files to data URLs
       files.forEach(file => {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setPhotoPreview(prev => [...prev, reader.result as string]);
+          const newPhotos = [...(formData.sitePhotos || []), reader.result as string];
+          updateField("sitePhotos", newPhotos);
         };
         reader.readAsDataURL(file);
       });
@@ -191,9 +188,9 @@ export const AssessmentForm = ({ formData, onChange, onCalculate }: Props) => {
               className="hidden"
               onChange={handleSitePhotoUpload}
             />
-            {photoPreview.length > 0 && (
+            {formData.sitePhotos && formData.sitePhotos.length > 0 && (
               <div className="flex gap-2 mt-2 flex-wrap">
-                {photoPreview.map((preview, idx) => (
+                {formData.sitePhotos.map((preview, idx) => (
                   <img key={idx} src={preview} alt={`Site ${idx + 1}`} className="h-20 w-20 object-cover rounded" />
                 ))}
               </div>

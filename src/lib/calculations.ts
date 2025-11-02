@@ -129,8 +129,12 @@ export function calculateAssessment(
   // Tiered pricing based on system capacity
   let ratePerKw = inputs.systemCostPerKw;
   if (financing.financingModel === "bank" || financing.financingModel === "udb") {
-    if (recommendedKw >= 100) {
+    if (recommendedKw >= 500) {
+      ratePerKw = 33000;
+    } else if (recommendedKw >= 200) {
       ratePerKw = 35000;
+    } else if (recommendedKw >= 100) {
+      ratePerKw = 40000;
     } else if (recommendedKw >= 50) {
       ratePerKw = 40000;
     } else {

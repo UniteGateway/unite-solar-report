@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { FinancingOptions, type FinancingData } from "@/components/assessment/Fi
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
 import { Charts } from "@/components/dashboard/Charts";
 import { calculateAssessment, type SiteInputs, type FinancingInputs, type CalculationResults } from "@/lib/calculations";
+import { getStatePolicy } from "@/lib/state-policies";
 import { AlertCircle, Download, Printer, FileText } from "lucide-react";
 import { toast } from "sonner";
 import uniteLogo from "@/assets/unite-logo.png";
@@ -47,6 +48,63 @@ const Index = () => {
 
   const [results, setResults] = useState<CalculationResults | null>(null);
   const [showReport, setShowReport] = useState(false);
+  
+  // Real-time auto-calculations
+  const [permittedSystemKw, setPermittedSystemKw] = useState(0);
+  const [autoSystemCost, setAutoSystemCost] = useState(0);
+  const [autoGst, setAutoGst] = useState(0);
+  const [autoTotalCost, setAutoTotalCost] = useState(0);
+
+  // Auto-calculate permitted KW and costs when CMD or state changes
+  useEffect(() => {
+    const cmdValue = parseFloat(formData.cmd);
+    if (cmdValue > 0) {
+      const policy = getStatePolicy(formData.stateKey);
+      const permitted = cmdValue * policy.cmdMultiplier;
+      setPermittedSystemKw(permitted);
+      
+      // Calculate auto system cost based on permitted KW and financing model
+      let ratePerKw = 45000;
+      if (financingData.financingModel === "bank" || financingData.financingModel === "udb") {
+        if (permitted >= 500) {
+          ratePerKw = 33000;
+        } else if (permitted >= 200) {
+          ratePerKw = 35000;
+        } else if (permitted >= 100) {
+          ratePerKw = 40000;
+        } else if (permitted >= 50) {
+          ratePerKw = 40000;
+        } else {
+          ratePerKw = 45000;
+        }
+      } else if (financingData.financingModel === "zero") {
+        ratePerKw = parseFloat(formData.systemCostPerKw) || 1000;
+      }
+      
+      const baseCost = permitted * ratePerKw;
+      const gst = baseCost * 0.089;
+      const total = baseCost + gst;
+      
+      setAutoSystemCost(baseCost);
+      setAutoGst(gst);
+      setAutoTotalCost(total);
+      
+      // Update required space
+      const sqft = parseFloat(formData.sqftPerKw) || 100;
+      const requiredSpace = Math.ceil(permitted * sqft);
+      if (formData.requiredSpace !== requiredSpace.toString()) {
+        setFormData(prev => ({
+          ...prev,
+          requiredSpace: requiredSpace.toString()
+        }));
+      }
+    } else {
+      setPermittedSystemKw(0);
+      setAutoSystemCost(0);
+      setAutoGst(0);
+      setAutoTotalCost(0);
+    }
+  }, [formData.cmd, formData.stateKey, formData.sqftPerKw, formData.systemCostPerKw, financingData.financingModel]);
 
   const handleCalculate = () => {
     try {
@@ -126,6 +184,31 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="assessment" className="space-y-6">
+            {/* Auto-Calculated Summary Card */}
+            {permittedSystemKw > 0 && (
+              <Card className="p-6 shadow-card bg-primary/5 border-primary">
+                <h3 className="text-lg font-semibold mb-4 text-foreground">Real-Time Calculation Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Permitted System (kW)</p>
+                    <p className="text-xl font-bold text-primary">{permittedSystemKw.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Base System Cost</p>
+                    <p className="text-xl font-bold text-foreground">₹{(autoSystemCost / 100000).toFixed(2)}L</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">GST (8.9%)</p>
+                    <p className="text-xl font-bold text-foreground">₹{(autoGst / 100000).toFixed(2)}L</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total System Cost</p>
+                    <p className="text-xl font-bold text-primary">₹{(autoTotalCost / 100000).toFixed(2)}L</p>
+                  </div>
+                </div>
+              </Card>
+            )}
+            
             <AssessmentForm 
               formData={formData} 
               onChange={setFormData} 
@@ -216,25 +299,76 @@ const Index = () => {
                 {/* Financial Details */}
                 <Card className="p-6 shadow-card">
                   <h3 className="text-lg font-semibold mb-4 text-foreground">Financial Summary</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-6">
+                    {/* Cost Breakdown */}
                     <div>
-                      <p className="text-sm text-muted-foreground">Down Payment</p>
-                      <p className="text-lg font-bold text-foreground">₹{(results.downPayment / 100000).toFixed(2)}L</p>
+                      <h4 className="text-md font-semibold mb-3 text-foreground">Cost Breakdown</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Base System Cost</p>
+                          <p className="text-lg font-bold text-foreground">₹{(results.baseSystemCost / 100000).toFixed(2)}L</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">GST (8.9%)</p>
+                          <p className="text-lg font-bold text-foreground">₹{(results.gstAmount / 100000).toFixed(2)}L</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total System Cost</p>
+                          <p className="text-lg font-bold text-primary">₹{(results.totalSystemCost / 100000).toFixed(2)}L</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Loan Amount</p>
-                      <p className="text-lg font-bold text-foreground">₹{(results.loanPrincipal / 100000).toFixed(2)}L</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Interest</p>
-                      <p className="text-lg font-bold text-foreground">₹{(results.totalInterest / 100000).toFixed(2)}L</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Monthly EMI</p>
-                      <p className="text-lg font-bold text-primary">₹{results.monthlyEmi.toFixed(0)}</p>
-                    </div>
+
+                    {/* Financing Breakdown */}
+                    {financingData.financingModel !== "zero" && (
+                      <div>
+                        <h4 className="text-md font-semibold mb-3 text-foreground">Financing Details ({financingData.financingModel.toUpperCase()})</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Down Payment</p>
+                            <p className="text-lg font-bold text-foreground">₹{(results.downPayment / 100000).toFixed(2)}L</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Loan Amount</p>
+                            <p className="text-lg font-bold text-foreground">₹{(results.loanPrincipal / 100000).toFixed(2)}L</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Total Interest</p>
+                            <p className="text-lg font-bold text-foreground">₹{(results.totalInterest / 100000).toFixed(2)}L</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Monthly EMI</p>
+                            <p className="text-lg font-bold text-primary">₹{results.monthlyEmi.toFixed(0)}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <div className="flex justify-between items-center">
+                            <p className="text-sm text-muted-foreground">Total Repayable (Principal + Interest)</p>
+                            <p className="text-xl font-bold text-foreground">₹{(results.totalRepayable / 100000).toFixed(2)}L</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Card>
+
+                {/* Site Photos Section */}
+                {formData.sitePhotos && formData.sitePhotos.length > 0 && (
+                  <Card className="p-6 shadow-card">
+                    <h3 className="text-lg font-semibold mb-4 text-foreground">Site Photos</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {formData.sitePhotos.map((photo, index) => (
+                        <div key={index} className="relative aspect-video overflow-hidden rounded-lg border border-border">
+                          <img 
+                            src={photo} 
+                            alt={`Site photo ${index + 1}`} 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-4 print:hidden">
